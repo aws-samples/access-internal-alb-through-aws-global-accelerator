@@ -25,7 +25,13 @@ aws cloudformation create-stack --stack-name int-alb-with-aws-ga \
    --region us-west-2
 ```
 ### How to Access Your Application
-Once stack creation is completed, it will output the AWS Global Accelerator DNS Name under "Outputs" tab of your stack. 
+Once stack creation is completed, it will output the AWS Global Accelerator DNS Name under "Outputs" tab of your stack. Another way of accessing via CLI:
+
+```
+aws cloudformation describe-stacks --stack-name int-alb-with-aws-ga \
+   --query "Stacks[0].Outputs[0].OutputValue" \
+   --region us-west-2
+```
 
 ###  Clean up
 After completing your demo, delete AWS CloudFormation Stack using AWS Console or AWS CLI:
