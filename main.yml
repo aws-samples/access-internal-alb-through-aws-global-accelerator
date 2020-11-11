@@ -37,7 +37,7 @@ Parameters:
 
   ResourceName:
     Type: String
-    Default: int-alb-with-ga-demo
+    Default: int-alb-with-aws-ga
     Description: Prefix of Resources created for this workshop.
 
 Metadata:

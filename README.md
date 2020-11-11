@@ -6,20 +6,20 @@ AWS CloudFormation template (main.yaml) will deploy a Virtual Private Cloud(VPC)
 You can read more in this [blog post](https://aws.amazon.com/blogs/networking-and-content-delivery/accessing-private-application-load-balancers-and-instances-through-aws-global-accelerator/).
 
 ### Architecture
-![int-alb-with-ga](diagram/diagram.png)
+![int-alb-with-aws-ga](diagram/diagram.png)
 
 ###  Launch the AWS CloudFormation Stack
 
 Click on the **Launch Stack** button below to launch the CloudFormation Stack to set up the AWS Global Accelerator Demo in the region of your preference, by default this demo will be deployed in us-west-2 (Oregon) region.
 
-[![Launch CFN stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-global-accelerator-with-internal-alb-demo.s3-us-west-2.amazonaws.com%2Fmain.yml&stackName=int-alb-with-ga)
+[![Launch CFN stack](https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png)](https://us-west-2.console.aws.amazon.com/cloudformation/home?region=us-west-2#/stacks/quickcreate?templateUrl=https%3A%2F%2Faws-global-accelerator-with-internal-alb-demo.s3-us-west-2.amazonaws.com%2Fmain.yml&stackName=int-alb-with-aws-ga)
 
-Provide a stack name eg **int-alb-with-ga**.
+Provide a stack name eg **int-alb-with-aws-ga**.
 
 You can launch the same stack using the AWS CLI. Here's an example:
 
 ```
-aws cloudformation create-stack --stack-name int-alb-with-ga \
+aws cloudformation create-stack --stack-name int-alb-with-aws-ga \
    --template-body file://main.yaml \
    --capabilities CAPABILITY_NAMED_IAM \
    --region us-west-2
@@ -28,7 +28,7 @@ aws cloudformation create-stack --stack-name int-alb-with-ga \
 ###  Clean up
 After completing your demo, delete AWS CloudFormation Stack using AWS Console or AWS CLI:
 ```
-aws cloudformation delete-stack --stack-name int-alb-with-ga  --region us-west-2
+aws cloudformation delete-stack --stack-name int-alb-with-aws-ga  --region us-west-2
 ```
 
 ## Security
