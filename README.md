@@ -1,7 +1,7 @@
 ## Access Internal Application Load Balancer through AWS Global Accelerator
 The purpose of this repository is to demo how to access an internal Application Load Balancer (ALB) through AWS Global Accelerator.
 
-AWS CloudFormation template (main.yaml) will deploy a Virtual Private Cloud(VPC) with 2 Public and 2 Private subnets within the VPC. Later it will create an Internal ALB attached to an AutoScaling Group where it will serve a simple PHP application and echo real-client IP using HTTP_X_FORWARDED_FOR header. The access to this PHP application is done through AWS Global Accelerator.
+AWS CloudFormation template (main.yaml) will deploy a Virtual Private Cloud(VPC) with 2 Public and 2 Private subnets within the VPC. Later it will create an Internal Application Load Balancer attached to an Auto Scaling Group where it will serve a simple PHP application and echo real-client IP using HTTP_X_FORWARDED_FOR header. The access to this PHP application is done through AWS Global Accelerator.
 
 You can read more in this [blog post](https://aws.amazon.com/blogs/networking-and-content-delivery/accessing-private-application-load-balancers-and-instances-through-aws-global-accelerator/).
 
