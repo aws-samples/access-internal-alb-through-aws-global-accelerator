@@ -1,0 +1,520 @@
+Parameters:
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.10.0.0/16
+
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.10.10.0/24
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.10.11.0/24
+
+  PrivateSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.10.20.0/24
+
+  PrivateSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.10.21.0/24
+
+  AllowedIP:
+    Description: Allowed IP range
+    Type: String
+    Default: 0.0.0.0/0
+
+  LatestLinux2AmiId:
+    Description: Region specific image from the Parameter Store
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+
+  ResourceName:
+    Type: String
+    Default: int-alb-with-ga-demo
+    AllowedValues:
+      - int-alb-with-ga-demo
+    Description: Prefix of Resources created for this workshop.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      -
+        Label:
+          default: "Resource Configuration"
+        Parameters:
+          - ResourceName
+    ParameterLabels:
+      ResourceName:
+        default: "Resource Prefix"
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Join [ -, [!Ref ResourceName, 'VPC'] ]
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Join [ -, [!Ref ResourceName, 'IGW'] ]
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Public Subnet (AZ1)
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: Public Subnet (AZ2)
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private Subnet (AZ1)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: Private Subnet (AZ2)
+
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway2EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+
+  NatGateway2:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway2EIP.AllocationId
+      SubnetId: !Ref PublicSubnet2
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Public Routes
+
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+
+  PrivateRouteTable1:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Private Routes (AZ1)
+
+  DefaultPrivateRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable1
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateRouteTable2:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: Private Routes (AZ2)
+
+  DefaultPrivateRoute2:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway2
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable2
+      SubnetId: !Ref PrivateSubnet2
+
+  WebServerPrefixList:
+    Type: AWS::EC2::PrefixList
+    Properties:
+      PrefixListName: "WebServerPrefixList"
+      AddressFamily: "IPv4"
+      MaxEntries: 10
+      Entries:
+        - Cidr: !Ref AllowedIP
+          Description: "AllowedIP"
+
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "web-server-sg"
+      GroupDescription: "Security Group for Web Servers"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        SourceSecurityGroupId: !Ref ALBSecurityGroup
+        FromPort: 80
+        ToPort: 80
+
+  # Internal ALB
+  InternalALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn:
+            Ref: WebServerTargetGroup
+      LoadBalancerArn:
+          Ref: InternalApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+  InternalApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internal
+      Subnets:
+      - Ref: PrivateSubnet1
+      - Ref: PrivateSubnet2
+      SecurityGroups:
+      - Ref: ALBSecurityGroup
+
+# Internal ALB Security Group with Allowed IP prefix
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: 'int-alb-with-ga-sg'
+        VpcId:
+          Ref: VPC
+        SecurityGroupIngress:
+            - IpProtocol: tcp
+              SourcePrefixListId: !Ref WebServerPrefixList
+              FromPort: 80
+              ToPort: 80
+
+  WebServerTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 5
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 3
+      HealthyThresholdCount: 3
+      Matcher:
+        HttpCode: '200'
+      Name: WebServerTargetGroup
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '10'
+      UnhealthyThresholdCount: 3
+      VpcId:
+        Ref: 'VPC'
+
+  LaunchConfigWebServer:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !Ref LatestLinux2AmiId
+      IamInstanceProfile: !Ref WebServerInstanceProfile
+      SecurityGroups:
+      - Ref: WebServerSecurityGroup
+      InstanceType: t3.micro
+      UserData: !Base64 |
+        #!/bin/bash -x
+        yum update -y
+        yum install httpd -y
+        sudo amazon-linux-extras install -y php7.2
+        service httpd start
+        chkconfig httpd on
+        cd /var/www/html
+        cat <<'EOT' >> /var/www/html/index.php
+        <?php
+        echo '<pre>';
+        echo 'HTTP_X_FORWARDED_FOR: ';
+        print_r($_SERVER['HTTP_X_FORWARDED_FOR']);
+        echo '</pre>';
+        exit;
+        ?>
+        EOT
+      EbsOptimized: "true"
+
+
+  AutoScalingWebServer:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !Ref PrivateSubnet1
+        - !Ref PrivateSubnet2
+      LaunchConfigurationName: !Ref LaunchConfigWebServer
+      MinSize: '1'
+      MaxSize: '1'
+      HealthCheckGracePeriod: 300
+      MaxInstanceLifetime: 2592000
+      TargetGroupARNs:
+        - !Ref WebServerTargetGroup
+
+  ### WebServer  IAM Role
+  WebServerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Join:
+          - '-'
+          - ['webserver-role', !Ref "AWS::Region"]
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+      - arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforSSM
+      Policies:
+        -
+          PolicyName: !Join [ -, ['webserver-policy', !Ref "AWS::Region"] ]
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              -
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:DescribeParameters
+                Resource:
+                  Fn::Join:
+                  - ':'
+                  - ["arn:aws:ssm", !Ref "AWS::Region", !Ref "AWS::AccountId", "*"]
+
+  WebServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName:
+        Fn::Join:
+          - '-'
+          - ['webserver-profile', !Ref "AWS::Region"]
+      Path: /
+      Roles:
+        - !Ref WebServerRole
+
+  GlobalAccelerator:
+    Type: AWS::GlobalAccelerator::Accelerator
+    Properties:
+      Name: WebGlobalAccelerator
+      Enabled: true
+
+  WebGAListener:
+    Type: AWS::GlobalAccelerator::Listener
+    Properties:
+      AcceleratorArn: !Ref GlobalAccelerator
+      Protocol: TCP
+      PortRanges:
+      - FromPort: 80
+        ToPort: 80
+
+  GlobalAcceleratorEndpointGroup:
+    Type: AWS::GlobalAccelerator::EndpointGroup
+    Properties:
+      ListenerArn:
+        Ref: WebGAListener
+      EndpointGroupRegion:
+        Ref: "AWS::Region"
+      TrafficDialPercentage: 100
+      EndpointConfigurations:
+      - EndpointId: !Ref InternalApplicationLoadBalancer
+        ClientIPPreservationEnabled: true
+        Weight: 100
+
+  GlobalAcceleratorSGCleanUp:
+    Type: Custom::GlobalAcceleratorSGCleanUp
+    Properties:
+      ServiceToken:
+       Fn::GetAtt:
+          - "GlobalAcceleratorSGCleanUpLambda"
+          - "Arn"
+
+  GlobalAcceleratorSGCleanUpLambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/GlobalAcceleratorSGCleanUpLambda
+      RetentionInDays: 30
+
+  GlobalAcceleratorSGCleanUpLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: !Join [ -, ['cleanup-lambda-policy', !Ref "AWS::Region"] ]
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:DescribeLogStreams
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            - ec2:DescribeSecurityGroups
+            - ec2:DeleteSecurityGroup
+            - ec2:DescribeNetworkInterfaces
+            Resource: '*'
+
+  GlobalAcceleratorSGCleanUpLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GlobalAcceleratorSGCleanUpLambda
+      Handler: "index.lambda_handler"
+      Runtime: python3.7
+      MemorySize: 128
+      Timeout: 60
+      Role: !GetAtt GlobalAcceleratorSGCleanUpLambdaRole.Arn
+      Code:
+        ZipFile: !Sub |
+            import json, boto3, logging, os, urllib3
+            import cfnresponse
+            logger = logging.getLogger()
+            logger.setLevel(logging.INFO)
+            VPCID = os.environ['VPCID']
+
+            def lambda_handler(event, context):
+                logger.info("event: {}".format(event))
+                try:
+                    if event['RequestType'] == 'Delete':
+                        ec2 = boto3.client('ec2')
+                        response = ec2.describe_security_groups( Filters=[{'Name': 'vpc-id', 'Values': [ VPCID ]},{'Name': 'group-name', 'Values': [ 'GlobalAccelerator' ]}])
+                        sg_id = response.get('SecurityGroups', [{}])[0].get('GroupId', '')
+                        enis = list_network_interfaces(sg_id)
+                        count = len(enis)
+                        while True:
+                         if count == 0:
+                             ec2.delete_security_group(GroupId=sg_id)
+                             break
+                    elif event['RequestType'] == 'Create':
+                        logger.info("event: {}".format(event))
+
+                    sendResponseCfn(event, context, cfnresponse.SUCCESS)
+                except Exception as e:
+                    logger.info("Exception: {}".format(e))
+                    sendResponseCfn(event, context, cfnresponse.FAILED)
+
+            def sendResponseCfn(event, context, responseStatus):
+                responseData = {}
+                responseData['Data'] = {}
+                cfnresponse.send(event, context, responseStatus, responseData, "CustomResourcePhysicalID")
+
+            def list_network_interfaces(sg_id):
+                # Retrieve the list network interfaces
+                ec2 = boto3.client('ec2')
+                try:
+                    response = ec2.describe_network_interfaces( Filters=[{'Name': 'group-id', 'Values': [ sg_id ]}])
+                    print(response)
+                except ClientError as e:
+                    logging.error(e)
+                    return None
+                return response['NetworkInterfaces']
+
+      Environment:
+        Variables:
+          VPCID:
+            !Ref VPC
+
+Outputs:
+  GlobalAcceleratorDNSName:
+    Description: "The Domain Name System (DNS) name that Global Accelerator creates that points to your accelerator's static IP addresses."
+    Value: !GetAtt GlobalAccelerator.DnsName
